@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ToonManager AI – TinyToon World</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f5fb;--sf:#fff;--tx:#1d1b2e;--mu:#6b6880;--bd:#e3e0f0;--ac:#6d4aff;--g:#1a9d5b;--y:#c58a00;--r:#d33b3b}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#12111a;--sf:#1c1a29;--tx:#eeecf8;--mu:#9a96b3;--bd:#2e2b42;--ac:#9a82ff;--g:#3ccf8a;--y:#f0b429;--r:#ff6b6b}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#12111a;--sf:#1c1a29;--tx:#eeecf8;--mu:#9a96b3;--bd:#2e2b42;--ac:#9a82ff;--g:#3ccf8a;--y:#f0b429;--r:#ff6b6b}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI","Noto Sans Devanagari",sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd);background:var(--sf);flex-wrap:wrap}
+header b{font-size:17px}header small{color:var(--mu)}
+.sp{flex:1}
+nav{display:flex;gap:4px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--bd);background:var(--sf)}
+nav a{padding:7px 12px;border-radius:8px;color:var(--mu);text-decoration:none;white-space:nowrap;font-weight:600;font-size:14px}
+nav a.on{background:var(--ac);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:16px}
+h2{margin:4px 0 12px;font-size:20px}h3{margin:0 0 8px;font-size:16px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:14px}
+.big{font-size:26px;font-weight:700}.mu{color:var(--mu)}.sm{font-size:13px}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700;border:1px solid currentColor}
+.G{color:var(--g)}.Y{color:var(--y)}.R{color:var(--r)}.N{color:var(--mu)}
+button{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--sf);color:var(--tx);cursor:pointer}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.item{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--bd);flex-wrap:wrap}
+.item:first-child{border-top:0}
+input,textarea,select{font:inherit;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+.scroll{overflow-x:auto}
+.bar{height:8px;border-radius:9px;background:var(--bd);overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.note{border-left:4px solid var(--y);padding:8px 12px;background:var(--sf);border-radius:6px;margin-bottom:12px}
+#modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+#modal .card{max-width:520px;width:100%;max-height:90%;overflow:auto}
+dl{margin:0}dt{font-weight:700;margin-top:8px;font-size:13px;color:var(--mu)}dd{margin:0}
+.hi{font-family:"Noto Sans Devanagari",system-ui,sans-serif}
+</style>
+</head>
+<body>
+<header><span style="font-size:22px">🎬</span><div><b>ToonManager AI</b><br><small>TinyToon World · @tinytoonworldhindii</small></div><span class="sp"></span><span class="tag N" id="mode">Nothing connected</span><button id="th">Theme</button></header>
+<nav id="nav"></nav>
+<main id="app"></main>
+<div id="modal"><div class="card" id="mbody"></div></div>
+<script>
+// ---------- storage (guarded) ----------
+const S={get(k,d){try{const v=localStorage.getItem("tm_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("tm_"+k,JSON.stringify(v))}catch(e){}}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---------- data ----------
+const INTEGRATIONS=[
+["Gemini API (story AI)","Needs your API key + a backend to hold it","Free tier available"],
+["Google Flow / Veo (video)","Needs official API access or an authorised account; paid credits","Paid – estimate unknown"],
+["ElevenLabs or other Hindi TTS","Needs API key; free tier has monthly character limits","Free tier / paid"],
+["FFmpeg render server","Must run on a server or your PC; cannot run inside this page","Free (open source)"],
+["n8n automation","Self-host or n8n Cloud; needs a server","Free self-hosted"],
+["Supabase (DB, auth, storage)","Needs a project; this page uses browser storage only","Free tier"],
+["YouTube Data + Analytics API","Needs Google Cloud project + OAuth 2.0 consent","Free quota"]];
+const ACTIONS=[
+["G","Story research"],["G","Scriptwriting"],["G","Draft generation"],["G","Character planning"],["G","Production tracking"],["G","Analytics analysis"],["G","Preparing metadata"],
+["Y","Generate paid videos"],["Y","Spend credits"],["Y","Purchase subscriptions"],["Y","Publish videos"],["Y","Schedule videos"],["Y","Change channel branding"],["Y","Reply to comments"],["Y","Send messages"],["Y","Connect external accounts"],
+["R","Share passwords"],["R","Expose private information"],["R","Delete channel content without explicit confirmation"],["R","Make unauthorised financial transactions"],["R","Bypass YouTube policies"],["R","Copy copyrighted videos"]];
+const STATUSES=["Idea","Story approved","Script completed","Characters completed","Scenes generated","Voiceover completed","Editing completed","Final review","Awaiting owner approval","Published"];
+const STAGES=[
+["Story","G",""],["Script","G",""],["Character references","Y","Image generation may use credits"],["Backgrounds","Y","Image generation may use credits"],["Scene breakdown","G",""],
+["AI video generation","Y","Veo/Flow credits"],["Hindi voice generation","Y","TTS characters/credits"],["Background music + SFX","G","Licensed/free sources only"],["FFmpeg edit + MP4 export","G","Needs render server"],["Owner approval","Y","Required before any publish"]];
+const CHARS=[
+{n:"Ramu Halwai (रामू हलवाई)",a:"Looks ~42, round, kind face",p:"Honest, hardworking, quietly proud; hums while frying",c:"Faded saffron kurta, white dhoti, flour-dusted apron, red gamchha on shoulder",f:"Warm eyes, thick black moustache, small round glasses",e:"Gentle smile, worried brow, wide-eyed wonder",v:"Warm middle-aged male Hindi voice, slow and soft"},
+{n:"Meena (मीना)",a:"Looks ~8, small and bouncy",p:"Curious, cheerful, always asks “क्यों?”",c:"Yellow frock, two braids with red ribbons, tiny blue chappals",f:"Big brown eyes, gap-toothed grin",e:"Giggle, pout, surprise gasp",v:"Bright child-like female Hindi voice, fast but clear"},
+{n:"Seth Dhanraj (सेठ धनराज)",a:"Looks ~55, tall and broad",p:"Greedy and boastful, but learns humility",c:"Maroon silk kurta, gold chain, heavy rings, cream turban",f:"Curled moustache, pudgy cheeks, raised eyebrow",e:"Smirk, scowl, red-faced shock",v:"Loud, booming male Hindi voice"},
+{n:"Baba Anna Pooran (बाबा अन्नपूर्ण)",a:"Looks ~70, thin, glowing calm",p:"Mysterious, funny, speaks in riddles",c:"White robe, rudraksha beads, wooden staff",f:"Long white beard, twinkling eyes",e:"Knowing wink, soft laugh",v:"Old, gentle, slightly raspy Hindi voice"}];
+const SCENES=[
+["गाँव की सुबह","Establishing shot: Indian village at sunrise, mud-brick shops, neem tree, smoke from a halwai’s chulha.","Narrator: “सूरज निकला, और रामपुर गाँव की सबसे छोटी दुकान में चूल्हा जल उठा।”"],
+["सुनी दुकान","Ramu stares at an empty counter while Seth Dhanraj’s big shop across the road overflows with customers.","Ramu: “आज भी कोई नहीं आया, मीना…”"],
+["भूखा बाबा","Baba Anna Pooran, tired and hungry, stops at Ramu’s stall with no money.","Baba: “बेटा, भूख लगी है। पैसे नहीं हैं।”"],
+["₹10 का समोसा","Ramu gives his last ₹10 worth of ingredients to make one samosa for Baba, with love.","Ramu: “पैसे की बात छोड़िए बाबा, पहले खा लीजिए।”"],
+["जादू","Baba smiles; the samosa glows golden and its aroma drifts across the village.","Baba: “जो प्यार से बनता है, उसमें जादू खुद आ जाता है।”"],
+["भीड़","Villagers follow the smell and line up; Meena counts customers, giggling.","Meena: “बापू! लाइन तो सड़क तक पहुँच गई!”"],
+["सेठ की चाल","Seth tries to buy the recipe for a bag of gold coins, but the magic fails in his kitchen.","Seth: “इसमें क्या खास है? मेरे समोसे में तो सोना लगा है!”"],
+["सीख","Seth’s samosas taste bitter; Ramu shares his batch with him. Seth apologises.","Narrator: “सच्चा स्वाद दिल से आता है, दौलत से नहीं।”"]];
+
+// ---------- state ----------
+let log=S.get("log",[]);
+let proj=S.get("proj",{status:0,stages:{}});
+let budget=S.get("budget",{limit:0,items:[]});
+const addLog=(t,k)=>{log.unshift({t:new Date().toLocaleString(),k,m:t});log=log.slice(0,200);S.set("log",log)};
+
+// ---------- approval modal ----------
+function ask(a,done){
+ const m=document.getElementById("modal"),b=document.getElementById("mbody");
+ if(a.level==="R"){b.innerHTML=`<h3 class="R">🔴 Prohibited action</h3><p>${esc(a.title)} is blocked by the RED policy. The AI will never do this.</p><button id="x">Close</button>`;m.style.display="flex";x.onclick=()=>{m.style.display="none"};addLog("Blocked (RED): "+a.title,"R");return}
+ b.innerHTML=`<h3 class="Y">🟡 Approval required</h3><dl>
+ <dt>1. Proposed action</dt><dd>${esc(a.title)}</dd>
+ <dt>2. Reason</dt><dd>${esc(a.reason)}</dd>
+ <dt>3. Expected result</dt><dd>${esc(a.result)}</dd>
+ <dt>4. Estimated cost</dt><dd>${esc(a.cost)}</dd>
+ <dt>5. Risks</dt><dd>${esc(a.risk)}</dd></dl>
+ <label class="row" style="margin:12px 0"><input type="checkbox" id="ck" style="width:auto"> I have read this and explicitly approve.</label>
+ <div class="row"><button class="p" id="ok" disabled>Approve</button><button id="no">Reject</button></div>
+ <p class="sm mu">Closing this window counts as rejection. Silence is never permission.</p>`;
+ m.style.display="flex";
+ ck.onchange=()=>{ok.disabled=!ck.checked};
+ ok.onclick=()=>{m.style.display="none";addLog("APPROVED: "+a.title,"Y");done&&done(true)};
+ no.onclick=()=>{m.style.display="none";addLog("REJECTED: "+a.title,"R");done&&done(false)};
+}
+m_close:document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal"){e.target.style.display="none";addLog("Approval dialog dismissed (treated as rejection)","R");}});
+
+// ---------- views ----------
+const V={};
+V.dashboard=()=>{
+ const na=`<div class="big N">—</div><div class="sm mu">Needs YouTube API connection</div>`;
+ const done=Object.values(proj.stages).filter(s=>s==="done").length;
+ return `<h2>Dashboard</h2>
+ <div class="note">No integrations are connected, so channel statistics are blank. Nothing here is estimated or faked.</div>
+ <div class="grid">
+ ${["Published videos","Total views","Subscribers","Watch hours","Latest video performance"].map(t=>`<div class="card"><div class="sm mu">${t}</div>${na}</div>`).join("")}
+ <div class="card"><div class="sm mu">Videos in production</div><div class="big">1</div><div class="sm mu">गरीब हलवाई और ₹10 का जादुई समोसा</div></div>
+ <div class="card"><div class="sm mu">Pending approvals</div><div class="big">${STAGES.filter(s=>s[1]==="Y"&&proj.stages[s[0]]!=="done").length}</div><div class="sm mu">Yellow-level stages waiting</div></div>
+ <div class="card"><div class="sm mu">Spent (logged by you)</div><div class="big">₹${budget.items.reduce((a,b)=>a+b.amt,0)}</div><div class="sm mu">${budget.limit?"Limit ₹"+budget.limit:"No limit set"}</div></div>
+ </div>
+ <div class="card" style="margin-top:12px"><h3>Production progress</h3><div class="bar"><i style="width:${done*10}%"></i></div><p class="sm mu">${done} of 10 stages marked done · Status: ${STATUSES[proj.status]}</p></div>
+ <div class="card" style="margin-top:12px"><h3>Weekly upload schedule</h3><p class="sm mu">No schedule yet. Scheduling is a YELLOW action and needs YouTube OAuth.</p></div>`;
+};
+V.story=()=>`<h2>Story generator</h2>
+ <div class="note">Live AI generation needs a Gemini key and a backend, so it is not connected. Below is the sample project’s original draft story, written for you to review and approve. Reference link analysis is not run; the draft takes only general pacing ideas (village setting, short moral arc), not any protected scenes or characters.</div>
+ <div class="card"><label class="sm mu">YouTube reference link (analysis disabled until AI is connected)</label><input value="https://youtu.be/GSczZT-dSWo" disabled></div>
+ <div class="card" style="margin-top:12px"><h3 class="hi">गरीब हलवाई और ₹10 का जादुई समोसा</h3>
+ <p class="sm mu">Moral: प्यार और ईमानदारी से बढ़कर कोई दौलत नहीं. Tone: comedy + emotion + light mystery. Target 5–8 min.</p>
+ ${SCENES.map((s,i)=>`<div class="item" style="align-items:flex-start"><div><b class="hi">${i+1}. ${esc(s[0])}</b><div class="sm">${esc(s[1])}</div><div class="hi sm mu">${esc(s[2])}</div></div></div>`).join("")}
+ <div class="row" style="margin-top:12px"><button class="p" id="apS" ${proj.stages.Story==="done"?"disabled":""}>${proj.stages.Story==="done"?"Story approved ✓":"Approve story"}</button></div></div>`;
+V.characters=()=>`<h2>Character library</h2><p class="sm mu">Descriptions are ready. Reference images are not generated (needs an image provider, a YELLOW action). Reuse these exact descriptions in every scene prompt for consistency.</p>
+ <div class="grid">${CHARS.map(c=>`<div class="card"><h3 class="hi">${esc(c.n)}</h3>
+ <div class="sm"><b>Age:</b> ${esc(c.a)}<br><b>Personality:</b> ${esc(c.p)}<br><b>Clothing:</b> ${esc(c.c)}<br><b>Appearance:</b> ${esc(c.f)}<br><b>Expressions:</b> ${esc(c.e)}<br><b>Voice:</b> ${esc(c.v)}</div>
+ <p class="sm mu">Camera angles: front, ¾ left, ¾ right, side, full body · Images: not generated</p></div>`).join("")}</div>`;
+V.pipeline=()=>`<h2>Production pipeline</h2>
+ <div class="card"><label class="sm mu">Project status</label><select id="st">${STATUSES.map((s,i)=>`<option value="${i}" ${i===proj.status?"selected":""}>${i+1}. ${s}</option>`).join("")}</select></div>
+ <div class="card" style="margin-top:12px"><h3>गरीब हलवाई और ₹10 का जादुई समोसा</h3>
+ ${STAGES.map(s=>{const st=proj.stages[s[0]]||"todo";return `<div class="item"><div><b>${s[0]}</b> <span class="tag ${s[1]}">${s[1]==="G"?"GREEN":"YELLOW"}</span><div class="sm mu">${st==="done"?"Done":st==="blocked"?"Approved, but blocked: provider not connected":"Not started"}${s[2]?" · "+s[2]:""}</div></div><button class="${s[1]==="Y"?"p":""}" data-s="${s[0]}" data-l="${s[1]}">${s[1]==="Y"?"Request approval":"Run"}</button></div>`}).join("")}</div>
+ <p class="sm mu">“Run” on a GREEN stage only records progress for work you or Claude actually completed (story, script). Render, TTS and video stages can’t run here and will be logged as blocked, never as success.</p>`;
+V.approvals=()=>`<h2>Approval policy & audit log</h2>
+ <div class="grid">${[["G","Green – automatic"],["Y","Yellow – ask first"],["R","Red – prohibited"]].map(([k,t])=>`<div class="card"><h3 class="${k}">${t}</h3>${ACTIONS.filter(a=>a[0]===k).map(a=>`<div class="item sm"><span>${esc(a[1])}</span>${k==="R"?`<button data-r="${esc(a[1])}">Test</button>`:""}</div>`).join("")}</div>`).join("")}</div>
+ <div class="card" style="margin-top:12px"><div class="row"><h3>Action log</h3><span class="sp"></span><button id="clr">Clear</button></div>
+ ${log.length?log.map(l=>`<div class="item sm"><span class="${l.k}">${esc(l.m)}</span><span class="mu">${esc(l.t)}</span></div>`).join(""):`<p class="sm mu">No actions yet.</p>`}</div>`;
+V.integrations=()=>`<h2>Integrations</h2><div class="note">Every service is disconnected. Connecting accounts is a YELLOW action. Keys and tokens must live on a secure backend, never in this page. Never share passwords.</div>
+ <div class="card scroll">${INTEGRATIONS.map(i=>`<div class="item"><div><b>${i[0]}</b><div class="sm mu">${i[1]}</div><div class="sm mu">Cost: ${i[2]}</div></div><span class="tag N">Not connected</span></div>`).join("")}</div>`;
+V.budget=()=>`<h2>Budget</h2><p class="sm mu">Manual tracker: nothing is auto-charged. Prefer free tiers; get a cost estimate before any generation.</p>
+ <div class="card"><div class="row"><div style="flex:1;min-width:150px"><label class="sm mu">Monthly limit (₹)</label><input id="lim" type="number" min="0" value="${budget.limit||""}"></div><button id="sl">Save limit</button></div></div>
+ <div class="card" style="margin-top:12px"><h3>Log an expense</h3><div class="row"><input id="bn" placeholder="What for?" style="flex:2;min-width:140px"><input id="ba" type="number" min="0" placeholder="₹" style="flex:1;min-width:80px"><button class="p" id="ab">Add</button></div>
+ ${budget.items.map(i=>`<div class="item sm"><span>${esc(i.n)}</span><b>₹${i.amt}</b></div>`).join("")}
+ <p class="mu sm">Total: ₹${budget.items.reduce((a,b)=>a+b.amt,0)}</p></div>
+ <div class="card" style="margin-top:12px"><h3>Cheaper path</h3><p class="sm">Write scripts with free Gemini tier; use free-tier TTS in short batches; generate only key scenes first; render with local FFmpeg (free); use royalty-free or self-made music.</p></div>`;
+
+// ---------- router ----------
+const NAV=["dashboard","story","characters","pipeline","approvals","integrations","budget"];
+function render(){
+ let h=(location.hash||"#dashboard").slice(1);if(!V[h])h="dashboard";
+ nav.innerHTML=NAV.map(n=>`<a href="#${n}" class="${n===h?"on":""}">${n[0].toUpperCase()+n.slice(1)}</a>`).join("");
+ app.innerHTML=V[h]();bind(h);
+}
+function bind(h){
+ const q=s=>app.querySelector(s);
+ if(h==="story"&&q("#apS"))q("#apS").onclick=()=>ask({title:"Approve the draft story as final",reason:"Moves the project to “Story approved” so script work can begin.",result:"Project status updated; no money spent.",cost:"₹0",risk:"None. You can edit later."},ok=>{if(ok){proj.stages.Story="done";proj.status=Math.max(proj.status,1);S.set("proj",proj)}render()});
+ if(h==="pipeline"){
+  q("#st").onchange=e=>{proj.status=+e.target.value;S.set("proj",proj);addLog("Status set to "+STATUSES[proj.status],"G")};
+  app.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{
+   const s=b.dataset.s,l=b.dataset.l,st=STAGES.find(x=>x[0]===s);
+   const blocked=["Character references","Backgrounds","AI video generation","Hindi voice generation","FFmpeg edit + MP4 export","Background music + SFX"].includes(s);
+   if(l==="G"){ if(blocked){addLog(s+": cannot run, provider not connected","R");proj.stages[s]="blocked"}else{proj.stages[s]="done";addLog(s+" marked done","G")} S.set("proj",proj);render();return}
+   ask({title:s,reason:"Required step in the production workflow for the sample project.",result:blocked?"Would run once the provider is connected. Today it is logged as blocked.":"Step recorded as approved.",cost:st[2]||"Unknown until a provider is connected; estimate will be shown first.",risk:"Paid credits could be used once connected; retries need fresh approval."},ok=>{if(ok){proj.stages[s]=blocked?"blocked":"done";S.set("proj",proj)}render()});
+  });
+ }
+ if(h==="approvals"){app.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>ask({level:"R",title:b.dataset.r}));q("#clr").onclick=()=>{log=[];S.set("log",log);render()}}
+ if(h==="budget"){
+  q("#sl").onclick=()=>{budget.limit=+q("#lim").value||0;S.set("budget",budget);render()};
+  q("#ab").onclick=()=>{const n=q("#bn").value.trim(),a=+q("#ba").value;if(n&&a>=0){budget.items.push({n,amt:a});S.set("budget",budget);addLog("Expense logged: "+n+" ₹"+a,"G");render()}};
+ }
+}
+document.getElementById("th").onclick=()=>{const r=document.documentElement,c=r.dataset.theme;r.dataset.theme=c==="light"?"dark":"light"};
+addEventListener("hashchange",render);render();
+</script>
+</body>
+</html>
